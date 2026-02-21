@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Remote Control</string>
+    <string name="accessibility_service_description">Remote Control Accessibility Service for device automation</string>
+</resources>

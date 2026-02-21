@@ -1,0 +1,24 @@
+# Android
+*.iml
+.gradle/
+/android/local.properties
+.idea/
+*.apk
+*.aab
+*.ap_
+*.dex
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Node.js
+node_modules/
+dist/
+.wrangler/
+
+# General
+.DS_Store
+*.log
+.env
+.env.local
