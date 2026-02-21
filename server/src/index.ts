@@ -177,9 +177,14 @@ export default {
 
       if (method === "POST" && pathname === "/api/action/tap-a11y") {
         const body = await readJsonObject(request);
-        const params: CommandRequest["tapA11y"] = {
-          path: readString(body, "path"),
-        };
+        const path = typeof body["path"] === "string" ? body["path"] : undefined;
+        const text = typeof body["text"] === "string" ? body["text"] : undefined;
+        if (!path && !text) {
+          throw new HttpError(400, "path or text parameter is required");
+        }
+        const params: Record<string, string> = {};
+        if (path) params.path = path;
+        if (text) params.text = text;
         return commandJsonResponse(await stub.sendCommand("action/tap-a11y", params));
       }
 
