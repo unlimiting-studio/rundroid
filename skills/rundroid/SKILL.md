@@ -228,6 +228,10 @@ curl -s -X POST $RUNDROID_URL/api/app/uninstall \
 - 단일 디바이스만 지원
 - 인증 없음 (네트워크 접근 가능한 누구나 사용 가능)
 
+## 참고 문서
+
+- [서버 배포 가이드](./SERVER_DEPLOY.md) - Cloudflare Workers 서버 설정 및 배포 방법
+
 ## 프로젝트 소스
 
 - GitHub: https://github.com/unlimiting-studio/rundroid
