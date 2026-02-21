@@ -95,32 +95,40 @@ class ScreenCaptureService : Service() {
     fun captureScreenshot(callback: (ByteArray?) -> Unit) {
         val reader = imageReader
         if (reader == null) {
+            Log.w(TAG, "ImageReader is null")
             callback(null)
             return
         }
 
         if (!isCapturing.compareAndSet(false, true)) {
+            Log.w(TAG, "Already capturing")
             callback(null)
             return
         }
 
-        reader.setOnImageAvailableListener({ imageReader ->
-            var image = imageReader.acquireLatestImage()
+        // Use a handler to retry acquireLatestImage with short delays
+        // VirtualDisplay continuously renders frames, so an image should be available quickly
+        val handler = Handler(Looper.getMainLooper())
+        val maxRetries = 10
+        var retryCount = 0
+
+        fun tryCapture() {
+            var image: android.media.Image? = null
             var bitmap: Bitmap? = null
             var croppedBitmap: Bitmap? = null
-            var callbackDelivered = false
-
-            fun deliver(result: ByteArray?) {
-                if (!callbackDelivered) {
-                    callbackDelivered = true
-                    callback(result)
-                }
-            }
 
             try {
+                image = reader.acquireLatestImage()
                 if (image == null) {
-                    deliver(null)
-                    return@setOnImageAvailableListener
+                    retryCount++
+                    if (retryCount < maxRetries) {
+                        handler.postDelayed(::tryCapture, 100)
+                        return
+                    }
+                    Log.w(TAG, "No image available after $maxRetries retries")
+                    isCapturing.set(false)
+                    callback(null)
+                    return
                 }
 
                 val width = image.width
@@ -139,24 +147,29 @@ class ScreenCaptureService : Service() {
                 bitmap = rawBitmap
                 rawBitmap.copyPixelsFromBuffer(buffer)
 
-                val actualBitmap = Bitmap.createBitmap(rawBitmap, 0, 0, width, height)
-                croppedBitmap = actualBitmap
-                val pngBytes = ScreenshotUtil.bitmapToPng(actualBitmap)
+                croppedBitmap = if (rowPadding > 0) {
+                    Bitmap.createBitmap(rawBitmap, 0, 0, width, height)
+                } else {
+                    rawBitmap
+                }
+                val pngBytes = ScreenshotUtil.bitmapToPng(croppedBitmap)
 
-                deliver(pngBytes)
+                isCapturing.set(false)
+                callback(pngBytes)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to capture screenshot", e)
-                deliver(null)
-            } finally {
-                croppedBitmap?.recycle()
-                if (bitmap !== croppedBitmap) {
-                    bitmap?.recycle()
-                }
-                image?.close()
-                imageReader.setOnImageAvailableListener(null, null)
                 isCapturing.set(false)
+                callback(null)
+            } finally {
+                if (croppedBitmap != null && croppedBitmap !== bitmap) {
+                    croppedBitmap.recycle()
+                }
+                bitmap?.recycle()
+                image?.close()
             }
-        }, Handler(Looper.getMainLooper()))
+        }
+
+        tryCapture()
     }
 
     private fun buildNotification(): Notification {
