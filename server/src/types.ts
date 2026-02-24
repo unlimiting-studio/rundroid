@@ -51,3 +51,11 @@ export interface PendingRequest {
   reject: (reason?: unknown) => void;
   timer: ReturnType<typeof setTimeout>;
 }
+
+export type DeviceControllerStub = DurableObjectStub & {
+  getStatus(): Promise<{ connected: boolean }>;
+  sendCommand(
+    command: string,
+    params?: Record<string, unknown>,
+  ): Promise<DeviceResponse | ArrayBuffer>;
+};

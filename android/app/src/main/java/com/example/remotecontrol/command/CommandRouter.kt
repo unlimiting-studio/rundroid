@@ -4,12 +4,15 @@ import android.accessibilityservice.AccessibilityService.GestureResultCallback
 import android.accessibilityservice.GestureDescription
 import android.content.Context
 import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.example.remotecontrol.model.DeviceCommand
 import com.example.remotecontrol.service.RemoteControlAccessibilityService
 import com.example.remotecontrol.service.ScreenCaptureService
 import com.example.remotecontrol.util.A11yTreeUtil
 import com.example.remotecontrol.util.PackageUtil
+import com.example.remotecontrol.util.ScreenshotOverlayUtil
 import com.example.remotecontrol.websocket.WebSocketManager
 import com.google.gson.Gson
 import com.google.gson.JsonElement
@@ -73,7 +76,8 @@ class CommandRouter(
                 sendErrorResponse(command.requestId, "Screenshot failed")
                 return@takeScreenshot
             }
-            webSocketManager.sendBinary(command.requestId, pngBytes)
+            val finalBytes = ScreenshotOverlayUtil.addRulers(pngBytes) ?: pngBytes
+            webSocketManager.sendBinary(command.requestId, finalBytes)
         }
     }
 
@@ -101,7 +105,13 @@ class CommandRouter(
         }
 
         val service = requireA11yService(command.requestId) ?: return
-        service.performTap(x, y, createGestureCallback(command.requestId))
+        val screenshot = getBooleanParam(command.params, "screenshot")
+        val callback = if (screenshot) {
+            createGestureCallbackWithScreenshot(command.requestId, x, y)
+        } else {
+            createGestureCallback(command.requestId)
+        }
+        service.performTap(x, y, callback)
     }
 
     private fun handleActionTapA11y(command: DeviceCommand) {
@@ -127,11 +137,15 @@ class CommandRouter(
 
         val bounds = Rect()
         node.getBoundsInScreen(bounds)
-        service.performTap(
-            bounds.exactCenterX(),
-            bounds.exactCenterY(),
+        val centerX = bounds.exactCenterX()
+        val centerY = bounds.exactCenterY()
+        val screenshot = getBooleanParam(command.params, "screenshot")
+        val callback = if (screenshot) {
+            createGestureCallbackWithScreenshot(command.requestId, centerX, centerY)
+        } else {
             createGestureCallback(command.requestId)
-        )
+        }
+        service.performTap(centerX, centerY, callback)
     }
 
     private fun handleActionSwipe(command: DeviceCommand) {
@@ -150,32 +164,53 @@ class CommandRouter(
         }
 
         val service = requireA11yService(command.requestId) ?: return
+        val screenshot = getBooleanParam(command.params, "screenshot")
+        val callback = if (screenshot) {
+            createGestureCallbackWithScreenshot(command.requestId, endX, endY)
+        } else {
+            createGestureCallback(command.requestId)
+        }
         service.performSwipe(
             startX = startX,
             startY = startY,
             endX = endX,
             endY = endY,
             duration = duration,
-            callback = createGestureCallback(command.requestId)
+            callback = callback
         )
     }
 
     private fun handleActionBack(command: DeviceCommand) {
         val service = requireA11yService(command.requestId) ?: return
         val result = service.performBack()
-        sendJsonResponse(command.requestId, result, performedData(result))
+        val screenshot = getBooleanParam(command.params, "screenshot")
+        if (screenshot && result) {
+            takeScreenshotAndSend(command.requestId)
+        } else {
+            sendJsonResponse(command.requestId, result, performedData(result))
+        }
     }
 
     private fun handleActionHome(command: DeviceCommand) {
         val service = requireA11yService(command.requestId) ?: return
         val result = service.performHome()
-        sendJsonResponse(command.requestId, result, performedData(result))
+        val screenshot = getBooleanParam(command.params, "screenshot")
+        if (screenshot && result) {
+            takeScreenshotAndSend(command.requestId)
+        } else {
+            sendJsonResponse(command.requestId, result, performedData(result))
+        }
     }
 
     private fun handleActionRecent(command: DeviceCommand) {
         val service = requireA11yService(command.requestId) ?: return
         val result = service.performRecent()
-        sendJsonResponse(command.requestId, result, performedData(result))
+        val screenshot = getBooleanParam(command.params, "screenshot")
+        if (screenshot && result) {
+            takeScreenshotAndSend(command.requestId)
+        } else {
+            sendJsonResponse(command.requestId, result, performedData(result))
+        }
     }
 
     private fun handleActionType(command: DeviceCommand) {
@@ -187,7 +222,12 @@ class CommandRouter(
 
         val service = requireA11yService(command.requestId) ?: return
         val result = service.typeText(text)
-        sendJsonResponse(command.requestId, result, performedData(result))
+        val screenshot = getBooleanParam(command.params, "screenshot")
+        if (screenshot && result) {
+            takeScreenshotAndSend(command.requestId)
+        } else {
+            sendJsonResponse(command.requestId, result, performedData(result))
+        }
     }
 
     private fun handleActionKey(command: DeviceCommand) {
@@ -200,18 +240,28 @@ class CommandRouter(
         val service = requireA11yService(command.requestId) ?: return
         commandScope.launch {
             val result = service.performKeyEvent(keyCode)
-            val data = JsonObject().apply {
-                addProperty("performed", result)
-                addProperty("note", "requires ADB or shell permissions for full support")
+            val screenshot = getBooleanParam(command.params, "screenshot")
+            if (screenshot && result) {
+                takeScreenshotAndSend(command.requestId)
+            } else {
+                val data = JsonObject().apply {
+                    addProperty("performed", result)
+                    addProperty("note", "requires ADB or shell permissions for full support")
+                }
+                sendJsonResponse(command.requestId, result, data)
             }
-            sendJsonResponse(command.requestId, result, data)
         }
     }
 
     private fun handleActionClearInput(command: DeviceCommand) {
         val service = requireA11yService(command.requestId) ?: return
         val result = service.clearInput()
-        sendJsonResponse(command.requestId, result, performedData(result))
+        val screenshot = getBooleanParam(command.params, "screenshot")
+        if (screenshot && result) {
+            takeScreenshotAndSend(command.requestId)
+        } else {
+            sendJsonResponse(command.requestId, result, performedData(result))
+        }
     }
 
     private fun handleAppInstall(command: DeviceCommand) {
@@ -323,6 +373,48 @@ class CommandRouter(
     private fun performedData(performed: Boolean): JsonObject {
         return JsonObject().apply {
             addProperty("performed", performed)
+        }
+    }
+
+    private fun getBooleanParam(params: JsonObject?, key: String): Boolean {
+        return params?.get(key)?.takeUnless { it.isJsonNull }
+            ?.let { runCatching { it.asBoolean }.getOrNull() } ?: false
+    }
+
+    private fun takeScreenshotAndSend(
+        requestId: String,
+        overlayX: Float? = null,
+        overlayY: Float? = null
+    ) {
+        Handler(Looper.getMainLooper()).postDelayed({
+            ScreenCaptureService.takeScreenshot { pngBytes ->
+                if (pngBytes == null) {
+                    // Action succeeded but screenshot failed — report action success, not screenshot error
+                    sendJsonResponse(requestId, true, performedData(true))
+                    return@takeScreenshot
+                }
+                val withOverlay = if (overlayX != null && overlayY != null) {
+                    ScreenshotOverlayUtil.addCircleOverlay(pngBytes, overlayX, overlayY) ?: pngBytes
+                } else pngBytes
+                val finalBytes = ScreenshotOverlayUtil.addRulers(withOverlay) ?: withOverlay
+                webSocketManager.sendBinary(requestId, finalBytes)
+            }
+        }, 500)
+    }
+
+    private fun createGestureCallbackWithScreenshot(
+        requestId: String,
+        overlayX: Float? = null,
+        overlayY: Float? = null
+    ): GestureResultCallback {
+        return object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                takeScreenshotAndSend(requestId, overlayX, overlayY)
+            }
+
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                sendErrorResponse(requestId, "Gesture cancelled")
+            }
         }
     }
 

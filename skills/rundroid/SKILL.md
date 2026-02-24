@@ -31,6 +31,34 @@ export RUNDROID_URL="https://your-rundroid-server.workers.dev"
 4. **type**으로 텍스트 입력
 5. 결과 **스크린샷**으로 확인
 
+### 액션 + 스크린샷 한 번에 (`?screenshot=true`)
+
+모든 action 엔드포인트에 `?screenshot=true` 쿼리 파라미터를 추가하면, 액션 실행 후 스크린샷을 한 번의 호출로 받을 수 있습니다. 별도 스크린샷 호출이 불필요하여 latency가 줄어듭니다.
+
+- 성공 시 응답이 `image/png` 바이너리로 반환됩니다.
+- tap, tap-a11y 액션은 터치 지점에 반투명 빨간 원 오버레이가 표시됩니다.
+- swipe 액션은 끝점에 오버레이가 표시됩니다.
+- 네비게이션(back, home, recent), type, key, clear-input은 오버레이 없이 스크린샷만 반환됩니다.
+- 액션은 성공했지만 스크린샷 캡처가 실패한 경우 `image/png` 대신 JSON 성공 응답이 반환됩니다.
+
+**중요**: 응답을 이미지로 저장하기 전에 반드시 `content-type`이 `image/png`인지 확인해야 합니다. JSON 응답을 이미지로 저장하면 깨진 파일이 됩니다.
+
+```bash
+# tap 후 바로 스크린샷 (터치 지점에 빨간 원 표시)
+# -D로 헤더를 저장하고, content-type 확인 후 이미지로 사용
+curl -s -X POST "$RUNDROID_URL/api/action/tap?screenshot=true" \
+  -H "Content-Type: application/json" \
+  -d '{"x": 540, "y": 630}' \
+  -D /tmp/resp_headers.txt \
+  -o /tmp/tap_result.png --max-time 15
+if grep -q 'image/png' /tmp/resp_headers.txt; then
+  echo "Screenshot saved"
+else
+  echo "No screenshot: $(cat /tmp/tap_result.png)"
+  rm -f /tmp/tap_result.png
+fi
+```
+
 ## API 레퍼런스
 
 모든 POST 요청은 `Content-Type: application/json` 헤더를 사용합니다.
@@ -44,11 +72,17 @@ curl -s $RUNDROID_URL/api/status
 
 ### 스크린샷
 
-PNG 이미지를 반환합니다. Read tool로 직접 볼 수 있습니다.
+성공 시 PNG 이미지를 반환합니다. Read tool로 직접 볼 수 있습니다.
+유효하지 않은 이미지인 경우 502 JSON 에러가 반환되므로, 저장 후 content-type을 확인하세요.
 
 ```bash
 curl -s -X POST $RUNDROID_URL/api/screenshot \
+  -D /tmp/resp_headers.txt \
   -o /tmp/screenshot.png --max-time 15
+if ! grep -q 'image/png' /tmp/resp_headers.txt; then
+  echo "Screenshot failed: $(cat /tmp/screenshot.png)"
+  rm -f /tmp/screenshot.png
+fi
 ```
 
 ### Accessibility 트리
@@ -209,6 +243,9 @@ curl -s -X POST $RUNDROID_URL/api/app/uninstall \
 {"requestId": "uuid", "success": true, "data": {"performed": true}}
 ```
 
+### 성공 (이미지)
+`screenshot` 엔드포인트 또는 `?screenshot=true` 파라미터 사용 시 `Content-Type: image/png` 바이너리로 반환됩니다. 유효한 PNG가 아닌 경우 502 에러가 반환됩니다.
+
 ### 실패
 ```json
 {"requestId": "uuid", "success": false, "error": "에러 메시지"}
@@ -217,6 +254,7 @@ curl -s -X POST $RUNDROID_URL/api/app/uninstall \
 ### 에러 HTTP 상태
 - 400: 잘못된 요청 (파라미터 누락/타입 오류)
 - 404: 없는 경로
+- 502: 잘못된 이미지 응답 (빈 이미지 또는 유효하지 않은 PNG)
 - 503: 디바이스 미연결
 - 504: 명령 타임아웃 (30초)
 

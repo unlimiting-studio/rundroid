@@ -103,13 +103,32 @@ class RemoteControlAccessibilityService : AccessibilityService() {
 
     fun findNodeByText(text: String): AccessibilityNodeInfo? {
         val root = rootInActiveWindow ?: return null
+        // Try built-in search first (matches text and contentDescription)
         val results = root.findAccessibilityNodeInfosByText(text)
-        if (results.isNullOrEmpty()) return null
-        val first = results[0]
-        for (i in 1 until results.size) {
-            results[i].recycle()
+        if (!results.isNullOrEmpty()) {
+            val first = results[0]
+            for (i in 1 until results.size) {
+                results[i].recycle()
+            }
+            return first
         }
-        return first
+        // Fallback: recursive contains-match on contentDescription and text
+        return findNodeRecursive(root, text)
+    }
+
+    private fun findNodeRecursive(node: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
+        val desc = node.contentDescription?.toString() ?: ""
+        val nodeText = node.text?.toString() ?: ""
+        if (desc.contains(text, ignoreCase = true) || nodeText.contains(text, ignoreCase = true)) {
+            return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val result = findNodeRecursive(child, text)
+            if (result != null) return result
+            child.recycle()
+        }
+        return null
     }
 
     fun performTap(x: Float, y: Float, callback: GestureResultCallback?) {
