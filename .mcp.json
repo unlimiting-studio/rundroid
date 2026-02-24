@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "rundroid": {
+      "type": "http",
+      "url": "https://rundroid-server.yechanny.workers.dev/mcp"
+    }
+  }
+}
