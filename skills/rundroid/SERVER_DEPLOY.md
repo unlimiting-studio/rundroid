@@ -54,6 +54,27 @@ new_classes = ["DeviceController"]
 npm run typecheck
 ```
 
+## 인증 설정 (선택)
+
+토큰을 설정하면 인증이 강제됩니다. 설정하지 않으면 기존처럼 무인증으로 동작합니다.
+
+```bash
+cd server
+npx wrangler secret put API_TOKEN
+npx wrangler secret put DEVICE_TOKEN
+```
+
+- `API_TOKEN`: `/api/*`, `/mcp` 호출 시 필요 (Authorization Bearer 또는 `X-API-Key`)
+- `DEVICE_TOKEN`: `/ws` 연결 시 필요 (Authorization Bearer 헤더 또는 `?token=` 쿼리)
+- Android 앱은 메인 화면의 `Device Token (optional)` 입력칸에 `DEVICE_TOKEN` 값을 넣으면 됩니다.
+
+예시:
+
+```bash
+curl -s https://<server>/api/status \
+  -H "Authorization: Bearer <API_TOKEN>"
+```
+
 ## 로컬 개발
 
 ```bash
