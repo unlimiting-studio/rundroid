@@ -5,12 +5,14 @@ export { DeviceController } from "./device-controller";
 
 export interface Env {
   DEVICE_CONTROLLER: DurableObjectNamespace;
+  API_TOKEN?: string;
+  DEVICE_TOKEN?: string;
 }
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
 };
 
 class HttpError extends Error {
@@ -53,6 +55,52 @@ function jsonResponse(data: unknown, status = 200): Response {
 function getStub(env: Env): DeviceControllerStub {
   const id = env.DEVICE_CONTROLLER.idFromName("default");
   return env.DEVICE_CONTROLLER.get(id) as DeviceControllerStub;
+}
+
+function readRequestToken(request: Request, url?: URL): string | null {
+  const auth = request.headers.get("authorization");
+  if (auth && auth.toLowerCase().startsWith("bearer ")) {
+    const token = auth.slice(7).trim();
+    if (token.length > 0) {
+      return token;
+    }
+  }
+
+  const apiKey = request.headers.get("x-api-key")?.trim();
+  if (apiKey) {
+    return apiKey;
+  }
+
+  const queryToken = url?.searchParams.get("token")?.trim();
+  if (queryToken) {
+    return queryToken;
+  }
+
+  return null;
+}
+
+function requireApiAuth(request: Request, env: Env): void {
+  const expected = env.API_TOKEN?.trim();
+  if (!expected) {
+    return;
+  }
+
+  const provided = readRequestToken(request);
+  if (provided !== expected) {
+    throw new HttpError(401, "Unauthorized");
+  }
+}
+
+function requireDeviceAuth(request: Request, env: Env, url: URL): void {
+  const expected = env.DEVICE_TOKEN?.trim();
+  if (!expected) {
+    return;
+  }
+
+  const provided = readRequestToken(request, url);
+  if (provided !== expected) {
+    throw new HttpError(401, "Unauthorized");
+  }
 }
 
 async function readJsonObject(request: Request): Promise<Record<string, unknown>> {
@@ -222,11 +270,13 @@ export default {
 
     try {
       if (method === "GET" && pathname === "/ws") {
+        requireDeviceAuth(request, env, url);
         const response = await stub.fetch(request);
         return withCors(response);
       }
 
       if (method === "POST" && pathname === "/mcp") {
+        requireApiAuth(request, env);
         const body = (await request.json()) as JsonRpcRequest;
         if (body.method?.startsWith("notifications/")) {
           await handleMcpRequest(body, stub);
@@ -236,19 +286,23 @@ export default {
       }
 
       if (method === "GET" && pathname === "/api/status") {
+        requireApiAuth(request, env);
         const status = await stub.getStatus();
         return jsonResponse(status);
       }
 
       if (method === "POST" && pathname === "/api/screenshot") {
+        requireApiAuth(request, env);
         return commandJsonResponse(await stub.sendCommand("screenshot"));
       }
 
       if (method === "POST" && pathname === "/api/a11y-tree") {
+        requireApiAuth(request, env);
         return commandJsonResponse(await stub.sendCommand("a11y-tree"));
       }
 
       if (method === "POST" && pathname === "/api/action/tap") {
+        requireApiAuth(request, env);
         const body = await readJsonObject(request);
         const params: Record<string, unknown> = {
           x: readNumber(body, "x"),
@@ -258,6 +312,7 @@ export default {
       }
 
       if (method === "POST" && pathname === "/api/action/tap-a11y") {
+        requireApiAuth(request, env);
         const body = await readJsonObject(request);
         const path = typeof body["path"] === "string" ? body["path"] : undefined;
         const text = typeof body["text"] === "string" ? body["text"] : undefined;
@@ -271,6 +326,7 @@ export default {
       }
 
       if (method === "POST" && pathname === "/api/action/swipe") {
+        requireApiAuth(request, env);
         const body = await readJsonObject(request);
         const params: Record<string, unknown> = {
           startX: readNumber(body, "startX"),
@@ -283,18 +339,22 @@ export default {
       }
 
       if (method === "POST" && pathname === "/api/action/back") {
+        requireApiAuth(request, env);
         return executeWithFollowUp(stub, "action/back", undefined, url);
       }
 
       if (method === "POST" && pathname === "/api/action/home") {
+        requireApiAuth(request, env);
         return executeWithFollowUp(stub, "action/home", undefined, url);
       }
 
       if (method === "POST" && pathname === "/api/action/recent") {
+        requireApiAuth(request, env);
         return executeWithFollowUp(stub, "action/recent", undefined, url);
       }
 
       if (method === "POST" && pathname === "/api/action/type") {
+        requireApiAuth(request, env);
         const body = await readJsonObject(request);
         const params: Record<string, unknown> = {
           text: readString(body, "text"),
@@ -303,6 +363,7 @@ export default {
       }
 
       if (method === "POST" && pathname === "/api/action/key") {
+        requireApiAuth(request, env);
         const body = await readJsonObject(request);
         const params: Record<string, unknown> = {
           keyCode: readNumber(body, "keyCode"),
@@ -311,10 +372,12 @@ export default {
       }
 
       if (method === "POST" && pathname === "/api/action/clear-input") {
+        requireApiAuth(request, env);
         return executeWithFollowUp(stub, "action/clear-input", undefined, url);
       }
 
       if (method === "POST" && pathname === "/api/app/install") {
+        requireApiAuth(request, env);
         const body = await readJsonObject(request);
         const params: CommandRequest["appInstall"] = {
           url: readString(body, "url"),
@@ -323,10 +386,12 @@ export default {
       }
 
       if (method === "GET" && pathname === "/api/app/list") {
+        requireApiAuth(request, env);
         return commandJsonResponse(await stub.sendCommand("app/list"));
       }
 
       if (method === "POST" && pathname === "/api/app/launch") {
+        requireApiAuth(request, env);
         const body = await readJsonObject(request);
         const params: Record<string, unknown> = {
           packageName: readString(body, "packageName"),
@@ -335,6 +400,7 @@ export default {
       }
 
       if (method === "POST" && pathname === "/api/app/stop") {
+        requireApiAuth(request, env);
         const body = await readJsonObject(request);
         const params: CommandRequest["appStop"] = {
           packageName: readString(body, "packageName"),
@@ -343,6 +409,7 @@ export default {
       }
 
       if (method === "POST" && pathname === "/api/app/uninstall") {
+        requireApiAuth(request, env);
         const body = await readJsonObject(request);
         const params: CommandRequest["appUninstall"] = {
           packageName: readString(body, "packageName"),

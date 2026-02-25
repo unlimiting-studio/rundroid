@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
         private const val TAG = "MainActivity"
         private const val PREFS_NAME = "remote_control_prefs"
         private const val SERVER_URL_KEY = "server_url"
+        private const val DEVICE_TOKEN_KEY = "device_token"
     }
 
     private lateinit var binding: ActivityMainBinding
@@ -127,6 +128,8 @@ class MainActivity : AppCompatActivity() {
     private fun restoreServerUrl() {
         val savedUrl = sharedPreferences.getString(SERVER_URL_KEY, "").orEmpty()
         binding.editServerUrl.setText(savedUrl)
+        val savedToken = sharedPreferences.getString(DEVICE_TOKEN_KEY, "").orEmpty()
+        binding.editAuthToken.setText(savedToken)
     }
 
     private fun toggleConnection() {
@@ -142,8 +145,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         sharedPreferences.edit().putString(SERVER_URL_KEY, url).apply()
+        val authToken = binding.editAuthToken.text?.toString()?.trim().orEmpty()
+        sharedPreferences.edit().putString(DEVICE_TOKEN_KEY, authToken).apply()
         binding.tvStatus.text = "Connecting..."
-        webSocketManager.connect(url)
+        webSocketManager.connect(url, authToken)
     }
 
     private fun updateAccessibilityStatus() {

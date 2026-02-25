@@ -45,6 +45,9 @@ class WebSocketManager(private val listener: ConnectionListener) {
     private var currentUrl: String? = null
 
     @Volatile
+    private var currentAuthToken: String? = null
+
+    @Volatile
     private var shouldReconnect: Boolean = false
 
     @Volatile
@@ -58,13 +61,14 @@ class WebSocketManager(private val listener: ConnectionListener) {
 
     private var reconnectJob: Job? = null
 
-    fun connect(url: String) {
+    fun connect(url: String, authToken: String?) {
         currentUrl = url
+        currentAuthToken = authToken
         shouldReconnect = true
         reconnectJob?.cancel()
         reconnectJob = null
         isReconnecting = false
-        openWebSocket(url)
+        openWebSocket(url, authToken)
     }
 
     fun disconnect() {
@@ -73,6 +77,7 @@ class WebSocketManager(private val listener: ConnectionListener) {
         reconnectJob = null
         isReconnecting = false
         reconnectDelayMs = INITIAL_BACKOFF_MS
+        currentAuthToken = null
 
         webSocket?.close(1000, "Manual disconnect")
         webSocket = null
@@ -102,12 +107,16 @@ class WebSocketManager(private val listener: ConnectionListener) {
         }
     }
 
-    private fun openWebSocket(url: String) {
+    private fun openWebSocket(url: String, authToken: String?) {
         webSocket?.cancel()
 
-        val request = Request.Builder()
-            .url(url)
-            .build()
+        val requestBuilder = Request.Builder().url(url)
+        val token = authToken?.trim().orEmpty()
+        if (token.isNotEmpty()) {
+            requestBuilder.header("Authorization", "Bearer $token")
+        }
+
+        val request = requestBuilder.build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -164,7 +173,7 @@ class WebSocketManager(private val listener: ConnectionListener) {
                 return@launch
             }
 
-            openWebSocket(url)
+            openWebSocket(url, currentAuthToken)
             reconnectDelayMs = (delayMs * 2).coerceAtMost(MAX_BACKOFF_MS)
             isReconnecting = false
         }
