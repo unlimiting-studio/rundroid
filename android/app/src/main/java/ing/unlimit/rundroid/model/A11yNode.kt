@@ -1,4 +1,4 @@
-package com.example.remotecontrol.model
+package ing.unlimit.rundroid.model
 
 data class A11yNode(
     val className: String?,

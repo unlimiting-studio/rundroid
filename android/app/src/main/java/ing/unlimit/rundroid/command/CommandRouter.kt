@@ -1,4 +1,4 @@
-package com.example.remotecontrol.command
+package ing.unlimit.rundroid.command
 
 import android.accessibilityservice.AccessibilityService.GestureResultCallback
 import android.accessibilityservice.GestureDescription
@@ -7,13 +7,13 @@ import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.example.remotecontrol.model.DeviceCommand
-import com.example.remotecontrol.service.RemoteControlAccessibilityService
-import com.example.remotecontrol.service.ScreenCaptureService
-import com.example.remotecontrol.util.A11yTreeUtil
-import com.example.remotecontrol.util.PackageUtil
-import com.example.remotecontrol.util.ScreenshotOverlayUtil
-import com.example.remotecontrol.websocket.WebSocketManager
+import ing.unlimit.rundroid.model.DeviceCommand
+import ing.unlimit.rundroid.service.RemoteControlAccessibilityService
+import ing.unlimit.rundroid.service.ScreenCaptureService
+import ing.unlimit.rundroid.util.A11yTreeUtil
+import ing.unlimit.rundroid.util.PackageUtil
+import ing.unlimit.rundroid.util.ScreenshotOverlayUtil
+import ing.unlimit.rundroid.websocket.WebSocketManager
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject

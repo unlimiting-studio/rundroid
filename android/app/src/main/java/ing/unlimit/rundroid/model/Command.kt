@@ -1,4 +1,4 @@
-package com.example.remotecontrol.model
+package ing.unlimit.rundroid.model
 
 import com.google.gson.JsonObject
 

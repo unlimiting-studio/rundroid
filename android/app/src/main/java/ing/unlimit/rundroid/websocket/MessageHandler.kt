@@ -1,8 +1,8 @@
-package com.example.remotecontrol.websocket
+package ing.unlimit.rundroid.websocket
 
 import android.util.Log
-import com.example.remotecontrol.command.CommandRouter
-import com.example.remotecontrol.model.DeviceCommand
+import ing.unlimit.rundroid.command.CommandRouter
+import ing.unlimit.rundroid.model.DeviceCommand
 import com.google.gson.Gson
 
 class MessageHandler(private val commandRouter: CommandRouter) {

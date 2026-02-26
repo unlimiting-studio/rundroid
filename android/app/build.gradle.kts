@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.remotecontrol"
+    namespace = "ing.unlimit.rundroid"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.remotecontrol"
+        applicationId = "ing.unlimit.rundroid"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

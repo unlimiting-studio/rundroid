@@ -1,4 +1,4 @@
-package com.example.remotecontrol.util
+package ing.unlimit.rundroid.util
 
 import android.app.PendingIntent
 import android.content.Context
@@ -10,7 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.util.Log
-import com.example.remotecontrol.model.AppInfo
+import ing.unlimit.rundroid.model.AppInfo
 import java.io.File
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -94,7 +94,7 @@ object PackageUtil {
                         val pendingIntent = PendingIntent.getBroadcast(
                             context,
                             sessionId,
-                            Intent("com.example.remotecontrol.INSTALL_COMPLETE")
+                            Intent("ing.unlimit.rundroid.INSTALL_COMPLETE")
                                 .setPackage(context.packageName),
                             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                         )

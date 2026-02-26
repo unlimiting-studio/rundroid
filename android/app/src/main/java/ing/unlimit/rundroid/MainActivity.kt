@@ -1,4 +1,4 @@
-package com.example.remotecontrol
+package ing.unlimit.rundroid
 
 import android.app.Activity
 import android.content.ComponentName
@@ -12,12 +12,12 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.example.remotecontrol.command.CommandRouter
-import com.example.remotecontrol.databinding.ActivityMainBinding
-import com.example.remotecontrol.service.RemoteControlAccessibilityService
-import com.example.remotecontrol.service.ScreenCaptureService
-import com.example.remotecontrol.websocket.MessageHandler
-import com.example.remotecontrol.websocket.WebSocketManager
+import ing.unlimit.rundroid.command.CommandRouter
+import ing.unlimit.rundroid.databinding.ActivityMainBinding
+import ing.unlimit.rundroid.service.RemoteControlAccessibilityService
+import ing.unlimit.rundroid.service.ScreenCaptureService
+import ing.unlimit.rundroid.websocket.MessageHandler
+import ing.unlimit.rundroid.websocket.WebSocketManager
 import okio.ByteString
 
 class MainActivity : AppCompatActivity() {

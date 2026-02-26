@@ -1,4 +1,4 @@
-package com.example.remotecontrol.util
+package ing.unlimit.rundroid.util
 
 import android.graphics.Bitmap
 import java.io.ByteArrayOutputStream

@@ -1,4 +1,4 @@
-package com.example.remotecontrol.service
+package ing.unlimit.rundroid.service
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityService.GestureResultCallback

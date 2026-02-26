@@ -1,9 +1,9 @@
-package com.example.remotecontrol.util
+package ing.unlimit.rundroid.util
 
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
-import com.example.remotecontrol.model.A11yNode
-import com.example.remotecontrol.model.Bounds
+import ing.unlimit.rundroid.model.A11yNode
+import ing.unlimit.rundroid.model.Bounds
 
 object A11yTreeUtil {
     fun buildTree(rootNode: AccessibilityNodeInfo?): A11yNode? {

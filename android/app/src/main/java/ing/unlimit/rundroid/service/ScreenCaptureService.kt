@@ -1,4 +1,4 @@
-package com.example.remotecontrol.service
+package ing.unlimit.rundroid.service
 
 import android.app.Activity
 import android.app.Notification
@@ -21,7 +21,7 @@ import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
-import com.example.remotecontrol.util.ScreenshotUtil
+import ing.unlimit.rundroid.util.ScreenshotUtil
 import java.util.concurrent.atomic.AtomicBoolean
 
 class ScreenCaptureService : Service() {

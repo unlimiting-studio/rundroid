@@ -1,4 +1,4 @@
-package com.example.remotecontrol.websocket
+package ing.unlimit.rundroid.websocket
 
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope

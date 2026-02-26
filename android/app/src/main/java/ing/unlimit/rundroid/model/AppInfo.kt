@@ -1,4 +1,4 @@
-package com.example.remotecontrol.model
+package ing.unlimit.rundroid.model
 
 data class AppInfo(
     val packageName: String,
