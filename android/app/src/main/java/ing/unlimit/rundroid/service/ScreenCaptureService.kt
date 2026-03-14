@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.pm.ServiceInfo
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
@@ -20,6 +21,7 @@ import android.os.Looper
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
+import androidx.core.app.ServiceCompat
 import androidx.core.app.NotificationCompat
 import ing.unlimit.rundroid.util.ScreenshotUtil
 import java.util.concurrent.atomic.AtomicBoolean
@@ -51,6 +53,16 @@ class ScreenCaptureService : Service() {
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
     private val isCapturing = AtomicBoolean(false)
+    private val projectionCallback = object : MediaProjection.Callback() {
+        override fun onStop() {
+            Log.i(TAG, "MediaProjection stopped by system")
+            releaseCaptureResources()
+            mediaProjection?.unregisterCallback(this)
+            mediaProjection = null
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -60,32 +72,24 @@ class ScreenCaptureService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification())
+        startCaptureForeground()
 
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
             ?: Activity.RESULT_CANCELED
         val resultData = intent?.let { extractResultData(it) }
 
         if (resultCode == Activity.RESULT_OK && resultData != null) {
-            mediaProjection?.stop()
-            mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, resultData)
-            setupVirtualDisplay()
-            Log.i(TAG, "MediaProjection initialized")
+            replaceMediaProjection(resultCode, resultData)
         } else {
             Log.w(TAG, "MediaProjection permission data is missing or denied")
         }
 
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        virtualDisplay?.release()
-        virtualDisplay = null
-        imageReader?.close()
-        imageReader = null
-        mediaProjection?.stop()
-        mediaProjection = null
+        clearMediaProjection(stopProjection = true)
         instance = null
         Log.i(TAG, "MediaProjection released")
     }
@@ -191,6 +195,35 @@ class ScreenCaptureService : Service() {
         notificationManager.createNotificationChannel(channel)
     }
 
+    private fun startCaptureForeground() {
+        val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+        } else {
+            0
+        }
+        ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), serviceType)
+    }
+
+    private fun replaceMediaProjection(resultCode: Int, resultData: Intent) {
+        clearMediaProjection(stopProjection = true)
+
+        try {
+            val projection = mediaProjectionManager.getMediaProjection(resultCode, resultData)
+            projection.registerCallback(projectionCallback, Handler(Looper.getMainLooper()))
+            mediaProjection = projection
+            setupVirtualDisplay()
+            Log.i(TAG, "MediaProjection initialized")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Failed to initialize MediaProjection due to OS security requirements", e)
+            clearMediaProjection(stopProjection = true)
+            stopSelf()
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "Failed to initialize MediaProjection session", e)
+            clearMediaProjection(stopProjection = true)
+            stopSelf()
+        }
+    }
+
     private fun setupVirtualDisplay() {
         val projection = mediaProjection
         if (projection == null) {
@@ -224,6 +257,25 @@ class ScreenCaptureService : Service() {
             null,
             null
         )
+    }
+
+    private fun clearMediaProjection(stopProjection: Boolean) {
+        val projection = mediaProjection
+        if (projection != null) {
+            projection.unregisterCallback(projectionCallback)
+        }
+        releaseCaptureResources()
+        if (stopProjection) {
+            projection?.stop()
+            mediaProjection = null
+        }
+    }
+
+    private fun releaseCaptureResources() {
+        virtualDisplay?.release()
+        virtualDisplay = null
+        imageReader?.close()
+        imageReader = null
     }
 
     private fun extractResultData(intent: Intent): Intent? {
